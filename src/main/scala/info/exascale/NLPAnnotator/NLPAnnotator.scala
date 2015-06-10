@@ -2,6 +2,9 @@ package info.exascale.NLPAnnotator
 
 import edu.stanford.nlp.ie.crf.CRFClassifier
 import java.util.Properties
+import org.apache.spark.SparkContext
+import org.apache.spark.SparkContext._
+import org.apache.spark.SparkConf
 
 object NER {
 
@@ -15,9 +18,15 @@ object NER {
    * printing a Set with all the entity labels.
    */
   def main(args: Array[String]) = {
-    val annotatedContent = classifier.classifyWithInlineXML("<lala>Barack Obama</lala>")
-    val ret = extractEntities(annotatedContent)
-    ret.foreach { println }
+
+    val file = "/usr/local/spark/README.md" // Should be some file on your system
+    val conf = new SparkConf().setAppName("Simple Application")
+    val sc = new SparkContext(conf)
+    val data = sc.textFile(file, 2).cache()
+    val annotatedText = data.map(toAnnotate => classifier.classifyWithInlineXML(toAnnotate))
+    println(annotatedText)
+    //val ret = extractEntities(annotatedText)
+    //ret.foreach { println }
   }
 
   private def extractEntities(content: String): Set[String] = {

@@ -21,6 +21,9 @@ libraryDependencies ++= Seq(
     "edu.stanford.nlp" % "stanford-corenlp" % "3.5.1" classifier "models"
 )
 
+// Spark
+libraryDependencies += "org.apache.spark" %% "spark-core" % "1.3.1" % "provided"
+
 // Misc
 libraryDependencies ++= Seq(
     "org.apache.tika" % "tika-core" % "1.7",
