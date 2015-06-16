@@ -19,23 +19,23 @@ object NER {
    */
   def main(args: Array[String]) = {
 
-    val file = "/usr/local/spark/README.md" // Should be some file on your system
+    val file = "/home/victor/XI/scala/nlpannotator/input.txt" // Should be some file on your system
     val conf = new SparkConf().setAppName("Simple Application")
     val sc = new SparkContext(conf)
     val data = sc.textFile(file, 2).cache()
     val annotatedText = data.map(toAnnotate => classifier.classifyWithInlineXML(toAnnotate))
-    println(annotatedText)
-    //val ret = extractEntities(annotatedText)
-    //ret.foreach { println }
+    prinln(annotatedText)
+    // val ret = extractEntities(annotatedText)
+    // ret.foreach { println }
   }
 
-  private def extractEntities(content: String): Set[String] = {
+  private def extractEntities(content: org.apache.spark.rdd.RDD[String]): Set[String] = {
     extractSingleType(content, "<PERSON>", "</PERSON>") ++
       extractSingleType(content, "<LOCATION>", "</LOCATION>") ++
       extractSingleType(content, "<ORGANIZATION>", "</ORGANIZATION>")
   }
 
-  private def extractSingleType(content: String, openTag: String, closeTag: String): Set[String] = {
+  private def extractSingleType(content: org.apache.spark.rdd.RDD[String], openTag: String, closeTag: String): Set[String] = {
     var entities = Set[String]()
 
     val fragments = content.split(openTag)
