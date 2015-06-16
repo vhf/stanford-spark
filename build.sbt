@@ -33,3 +33,7 @@ libraryDependencies ++= Seq(
     "com.typesafe.play" %% "play-json" % "2.3.8"
 )
 
+// Scopt
+libraryDependencies += "com.github.scopt" %% "scopt" % "3.3.0"
+
+resolvers += Resolver.sonatypeRepo("public")

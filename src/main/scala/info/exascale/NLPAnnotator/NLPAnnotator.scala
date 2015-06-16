@@ -5,45 +5,51 @@ import java.util.Properties
 import org.apache.spark.SparkContext
 import org.apache.spark.SparkContext._
 import org.apache.spark.SparkConf
+import java.io.File
+import scopt.OptionParser
+
+case class Config(
+                   input: File = new File("."),
+                   output: File = new File("."),
+                   props: Seq[String] = Seq(),
+                   classifier: String = ""
+                   )
 
 object NER {
 
-  private val props = new Properties()
-  props.put("annotators", "tokenize")
-  private val classifier = CRFClassifier.getClassifierNoExceptions(
-    "edu/stanford/nlp/models/ner/english.all.3class.distsim.crf.ser.gz")
-
-  /**
-   * Runs the Stanford Named Entity Reconizer on the given content,
-   * printing a Set with all the entity labels.
-   */
+  val props = new Properties()
+  // sbt "run --input ./input.txt --output ./output.txt --properties tokenize,ssplit --classifier edu/stanford/nlp/models/ner/english.all.3class.distsim.crf.ser.gz"
   def main(args: Array[String]) = {
-
-    val file = "/usr/local/spark/README.md" // Should be some file on your system
-    val conf = new SparkConf().setAppName("Simple Application")
-    val sc = new SparkContext(conf)
-    val data = sc.textFile(file, 2).cache()
-    val annotatedText = data.map(toAnnotate => classifier.classifyWithInlineXML(toAnnotate))
-    println(annotatedText)
-    //val ret = extractEntities(annotatedText)
-    //ret.foreach { println }
-  }
-
-  private def extractEntities(content: String): Set[String] = {
-    extractSingleType(content, "<PERSON>", "</PERSON>") ++
-      extractSingleType(content, "<LOCATION>", "</LOCATION>") ++
-      extractSingleType(content, "<ORGANIZATION>", "</ORGANIZATION>")
-  }
-
-  private def extractSingleType(content: String, openTag: String, closeTag: String): Set[String] = {
-    var entities = Set[String]()
-
-    val fragments = content.split(openTag)
-    fragments.slice(1, fragments.length).foreach { fragment =>
-      val label = fragment.split(closeTag)(0)
-      entities += label
+    val parser = new scopt.OptionParser[Config]("scopt") {
+      head("NLPAnnotator", "0.x")
+      opt[File]('i', "input") required() valueName("<file>") action { (x, c) =>
+        c.copy(input = x) } text("input file")
+      opt[File]('o', "output") required() valueName("<file>") action { (x, c) =>
+        c.copy(output = x) } text("output file")
+      opt[Seq[String]]('p', "properties") valueName("<prop1>,<prop2>...") action { (x,c) =>
+        c.copy(props = x) } text("properties")
+      opt[String]('c', "classifier") action { (x, c) =>
+        c.copy(classifier = x) } text("Stanford NLP classifier to use")
+      help("help") text("prints this usage text")
     }
+    parser.parse(args, Config()) match {
+      case Some(config) =>
+        val properties = config.props mkString ","
+        props.put("annotators", properties) // "tokenize, ssplit"
 
-    entities.toSet
+        val classifier = CRFClassifier.getClassifierNoExceptions(config.classifier) // edu/stanford/nlp/models/ner/english.all.3class.distsim.crf.ser.gz
+
+        val input = config.input.getAbsolutePath()
+        println(input)
+        val output = config.output.getAbsolutePath()
+        println(output)
+        val conf = new SparkConf().setAppName("Simple Application")
+        val sc = new SparkContext(conf)
+        val data = sc.textFile(input, 2).cache()
+        val annotatedText = data.map(toAnnotate => classifier.classifyWithInlineXML(toAnnotate))
+        println(annotatedText)
+      case _ =>
+        println("error")
+    }
   }
 }
