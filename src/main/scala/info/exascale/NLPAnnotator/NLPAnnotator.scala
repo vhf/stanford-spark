@@ -35,15 +35,15 @@ object NER {
     parser.parse(args, Config()) match {
       case Some(config) =>
         val properties = config.props mkString ","
-        props.put("annotators", properties) // "tokenize, ssplit"
+        props.put("annotators", properties)
 
-        val classifier = CRFClassifier.getClassifierNoExceptions(config.classifier) // edu/stanford/nlp/models/ner/english.all.3class.distsim.crf.ser.gz
+        val classifier = CRFClassifier.getClassifierNoExceptions(config.classifier)
 
         val input = config.input.getAbsolutePath()
         println(input)
         val output = config.output.getAbsolutePath()
         println(output)
-        val conf = new SparkConf().setAppName("Simple Application")
+        val conf = new SparkConf().setAppName("NLPAnnotator")
         val sc = new SparkContext(conf)
         val data = sc.textFile(input, 2).cache()
         val annotatedText = data.map(toAnnotate => classifier.classifyWithInlineXML(toAnnotate))
