@@ -37,17 +37,18 @@ object NER {
         val properties = config.props mkString ","
         props.put("annotators", properties)
 
-        val classifier = CRFClassifier.getClassifierNoExceptions(config.classifier)
-
         val input = config.input.getAbsolutePath()
-        println(input)
+        // println(input)
         val output = config.output.getAbsolutePath()
-        println(output)
+        // println(output)
         val conf = new SparkConf().setAppName("NLPAnnotator")
         val sc = new SparkContext(conf)
         val data = sc.textFile(input, 2).cache()
-        val annotatedText = data.map(toAnnotate => classifier.classifyWithInlineXML(toAnnotate))
-        println(annotatedText)
+        val annotatedText = data.map{ toAnnotate =>
+          val classifier = CRFClassifier.getClassifierNoExceptions(config.classifier)
+          classifier.classifyWithInlineXML(toAnnotate)
+        }
+        annotatedText.saveAsTextFile(output)
       case _ =>
         println("error")
     }
