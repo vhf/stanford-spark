@@ -43,9 +43,11 @@ object NER {
         val conf = new SparkConf().setAppName("NLPAnnotator")
         val sc = new SparkContext(conf)
         val data = sc.textFile(input, 2).cache()
-        val annotatedText = data.map{ toAnnotate =>
+        val annotatedText = data.mapPartitions{ iter =>
           val classifier = CRFClassifier.getClassifierNoExceptions(config.classifier)
-          classifier.classifyWithInlineXML(toAnnotate)
+           iter.map { sentence =>
+            classifier.classifyWithInlineXML(sentence)
+          }
         }
         annotatedText.saveAsTextFile(output)
       case _ =>
