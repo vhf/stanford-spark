@@ -1,7 +1,6 @@
 package info.exascale.NLPAnnotator
 
-import edu.arizona.sista.processors.Processor
-import edu.arizona.sista.processors.corenlp.CoreNLPProcessor
+import edu.stanford.nlp.ie.crf.CRFClassifier
 import java.util.Properties
 import org.apache.spark.SparkContext
 import org.apache.spark.SparkContext._
@@ -18,15 +17,7 @@ case class Config(
 
 object NER {
 
-  def annotateDoc(proc : Processor, input : String) = {
-    val doc = proc.mkDocument(input)
-    proc.tagPartsOfSpeech(doc)
-    proc.lemmatize(doc)
-    proc.recognizeNamedEntities(doc)
-    doc.clear()
-    doc
-  }
-
+  val props = new Properties()
   // sbt "run --input ./input.txt --output ./output.txt --properties tokenize,ssplit --classifier edu/stanford/nlp/models/ner/english.all.3class.distsim.crf.ser.gz"
   def main(args: Array[String]) = {
     val parser = new scopt.OptionParser[Config]("scopt") {
@@ -43,8 +34,8 @@ object NER {
     }
     parser.parse(args, Config()) match {
       case Some(config) =>
-        // val properties = config.props mkString ","
-        // props.put("annotators", properties)
+        val properties = config.props mkString ","
+        props.put("annotators", properties)
 
         val input = config.input.getAbsolutePath()
         val output = config.output.getAbsolutePath()
@@ -52,11 +43,9 @@ object NER {
         val conf = new SparkConf().setAppName("NLPAnnotator")
         val sc = new SparkContext(conf)
         val data = sc.textFile(input, 2).cache()
-
-        val proc:Processor = new CoreNLPProcessor()
-
         val annotatedText = data.map{ toAnnotate =>
-          annotateDoc(proc, toAnnotate)
+          val classifier = CRFClassifier.getClassifierNoExceptions(config.classifier)
+          classifier.classifyWithInlineXML(toAnnotate)
         }
         annotatedText.saveAsTextFile(output)
       case _ =>
