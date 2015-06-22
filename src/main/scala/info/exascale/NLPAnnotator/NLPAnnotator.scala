@@ -25,7 +25,7 @@ object NER {
       opt[File]('i', "input") required() valueName("<file>") action { (x, c) =>
         c.copy(input = x) } text("input file")
       opt[File]('o', "output") required() valueName("<file>") action { (x, c) =>
-        c.copy(output = x) } text("output file")
+        c.copy(output = x) } text("output directory")
       opt[Seq[String]]('p', "properties") valueName("<prop1>,<prop2>...") action { (x,c) =>
         c.copy(props = x) } text("properties")
       opt[String]('c', "classifier") action { (x, c) =>
@@ -38,9 +38,8 @@ object NER {
         props.put("annotators", properties)
 
         val input = config.input.getAbsolutePath()
-        // println(input)
         val output = config.output.getAbsolutePath()
-        // println(output)
+
         val conf = new SparkConf().setAppName("NLPAnnotator")
         val sc = new SparkContext(conf)
         val data = sc.textFile(input, 2).cache()
