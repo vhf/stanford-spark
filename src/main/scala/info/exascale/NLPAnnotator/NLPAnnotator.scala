@@ -64,19 +64,20 @@ object NER {
             pipeline.annotate(document)
 
             val sentences = document.get(classOf[SentencesAnnotation]).asScala
-            val tokens = sentences.toSeq.map(sentence => {
+            val tokens = sentences.toSeq.flatMap(sentence => {
               sentence.get(classOf[TokensAnnotation]).asScala.toSeq.map(token => {
                 val word = token.get(classOf[TextAnnotation])
-                val ne = token.get(classOf[NamedEntityTagAnnotation])
-                val offset = token.beginPosition
-                (word, ne, offset)
+                val pos = token.get(classOf[PartOfSpeechAnnotation])
+                val ner = token.get(classOf[NamedEntityTagAnnotation])
+                //(word, ne, offset)
+                s"word: $word, pos : $pos, ner : $ner\n"
               })
-            }).flatten
+            })
             tokens
           }
         }
 
-        annotatedText.saveAsTextFile(output)
+        annotatedText.flatMap(identity).saveAsTextFile(output)
       case _ =>
         println("error")
     }
