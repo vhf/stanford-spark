@@ -70,7 +70,7 @@ object NER {
                 val pos = token.get(classOf[PartOfSpeechAnnotation])
                 val ner = token.get(classOf[NamedEntityTagAnnotation])
                 //(word, ne, offset)
-                s"word: $word, pos : $pos, ner : $ner\n"
+                s"word: $word, pos : $pos, ner : $ner"
               })
             })
             tokens
