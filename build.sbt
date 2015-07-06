@@ -36,4 +36,8 @@ libraryDependencies ++= Seq(
 // Scopt
 libraryDependencies += "com.github.scopt" %% "scopt" % "3.3.0"
 
+// Pickle
+libraryDependencies += "org.scala-lang.modules" %% "scala-pickling" % "0.10.1"
+
+
 resolvers += Resolver.sonatypeRepo("public")

@@ -20,6 +20,11 @@ import scopt.OptionParser
 import scala.collection.mutable.ArrayBuffer
 import scala.io.Source._
 
+import scala.pickling.Defaults._
+import scala.pickling.json._
+
+
+
 object NER {
 
   case class Config(
@@ -96,6 +101,9 @@ object NER {
               }
             }
             println(out)
+            val pckl = out.pickle
+            val json = pckl.value
+            println(json)
 //          }
 //        }
 
