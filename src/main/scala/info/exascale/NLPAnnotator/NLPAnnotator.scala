@@ -68,7 +68,7 @@ object NER {
         val annotatedText = data.mapPartitions{ iter =>
           iter.map { part =>
             // create an empty Annotation just with the given text
-            val document : Annotation = new Annotation("Barack Hussein Obama II is the 44th and current President of the United States and the first African-American to hold the office. He is a Democrat. Obama won the 2008 United States presidential election, on November 4, 2008. He was inaugurated on January 20, 2009.\n\nAs president, he slowly ended the wars in Afghanistan and Iraq, with intention to prepare the countries so that they could defend themselves. He also signed the Affordable Care Act (often called \"Obamacare\") which changed many health care laws. He also enacted numerous acts to create public works jobs to help the economy. He became the first president to openly express support for gay marriage, proposed gun control as a result of the Sandy Hook school shooting and has called for improving relations with Cuba.")//part)
+            val document : Annotation = new Annotation(part)
             pipeline.annotate(document)
 
             val sentences = document.get(classOf[SentencesAnnotation]).asScala
@@ -81,28 +81,36 @@ object NER {
                 val beg = token.get(classOf[CharacterOffsetBeginAnnotation])
                 val end = token.get(classOf[CharacterOffsetEndAnnotation])
                 //(word, ne, offset)
-                Map("word" -> word, "ner" -> ner)
+                Map("word" -> word, "ner" -> ner, "beg" -> beg, "end" -> end, "pos" -> pos)
               })
             })
-            var out = ArrayBuffer[Map[String, String]]()
+            //                            word    beg  end  pos          ner
+            var out = ArrayBuffer[Map[String, Any]]()
             var currentNerTag = (-1, "")
-            var currentExpression = ""
+            var currentExpression = ArrayBuffer[String]()
+            var currentPosArray = ArrayBuffer[String]()
+            var firstTokenStart = -1
+            var lastTokenEnd = -1
             for (i <- tokens.indices) {
               val token = tokens(i)
               if (token("ner").toString != currentNerTag._2) {
-                if (currentExpression != "" && currentNerTag._2.trim != "O") {
-                  out += Map("word" -> currentExpression, "ner" -> currentNerTag._2)
+                if (firstTokenStart != -1) {
+                  out += Map("word" -> currentExpression.mkString(" "), "offset_start" -> firstTokenStart, "offset_end" -> lastTokenEnd, "pos" -> currentPosArray, "ner" -> currentNerTag._2)
                 }
                 currentNerTag = (i, token("ner").toString)
-                currentExpression = token("word")
+                currentExpression = ArrayBuffer(token("word").toString)
+                currentPosArray = ArrayBuffer(token("pos").toString)
+                firstTokenStart = token("beg").toString.toInt
               } else {
-                currentExpression += " " + token("word")
+                currentExpression ++= ArrayBuffer(token("word").toString)
+                currentPosArray ++= ArrayBuffer(token("pos").toString)
+                lastTokenEnd = token("end").toString.toInt
               }
             }
             out
           }
         }
-        annotatedText.flatMap(identity).map(x => Json(DefaultFormats).write(x)).saveAsTextFile(output)
+        annotatedText.map(x => Json(DefaultFormats).write(x)).saveAsTextFile(output)
       case _ =>
         println("error")
     }
