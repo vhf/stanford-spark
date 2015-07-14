@@ -34,6 +34,14 @@ object NER {
                      props: Seq[String] = Seq()
                      )
 
+  case class JSONObject(
+                      word: String,
+                      start: Int,
+                      end: Int,
+                      pos: ArrayBuffer[String],
+                      ner: String
+                      )
+
   val props = new Properties()
   def main(args: Array[String]) {
     val parser = new scopt.OptionParser[Config]("scopt") {
@@ -84,30 +92,62 @@ object NER {
                 Map("word" -> word, "ner" -> ner, "beg" -> beg, "end" -> end, "pos" -> pos)
               })
             })
-            //                            word    beg  end  pos          ner
-            var out = ArrayBuffer[Map[String, Any]]()
-            var currentNerTag = (-1, "")
+
+            var out = ArrayBuffer[JSONObject]()
+            var currentNerTag = ""
             var currentExpression = ArrayBuffer[String]()
             var currentPosArray = ArrayBuffer[String]()
             var firstTokenStart = -1
             var lastTokenEnd = -1
+
             for (i <- tokens.indices) {
               val token = tokens(i)
-              if (token("ner").toString != currentNerTag._2) {
-                if (firstTokenStart != -1) {
-                  out += Map("word" -> currentExpression.mkString(" "), "offset_start" -> firstTokenStart, "offset_end" -> lastTokenEnd, "pos" -> currentPosArray, "ner" -> currentNerTag._2)
-                }
-                currentNerTag = (i, token("ner").toString)
-                currentExpression = ArrayBuffer(token("word").toString)
-                currentPosArray = ArrayBuffer(token("pos").toString)
-                firstTokenStart = token("beg").toString.toInt
+              val word = token("word").toString
+              val ner = token("ner").toString
+              val pos = token("pos").toString
+              val beg = token("beg").toString.toInt
+              val end = token("end").toString.toInt
+
+              if (ner == "O") {
+                out += JSONObject(
+                  word,
+                  beg,
+                  end,
+                  ArrayBuffer(pos),
+                  ner
+                )
               } else {
-                currentExpression ++= ArrayBuffer(token("word").toString)
-                currentPosArray ++= ArrayBuffer(token("pos").toString)
-                lastTokenEnd = token("end").toString.toInt
+                if (ner != currentNerTag) {
+                  if (currentExpression.length != 0) {
+                    out += JSONObject(
+                      currentExpression.mkString(" "),
+                      firstTokenStart,
+                      lastTokenEnd,
+                      currentPosArray,
+                      currentNerTag
+                    )
+                  }
+                  currentNerTag = ner
+                  currentExpression = ArrayBuffer(word)
+                  currentPosArray = ArrayBuffer(pos)
+                  firstTokenStart = beg
+                } else {
+                  currentExpression ++= ArrayBuffer(word)
+                  currentPosArray ++= ArrayBuffer(pos)
+                  lastTokenEnd = end
+                }
               }
             }
-            out
+            if (currentExpression.length != 0) {
+              out += JSONObject(
+                currentExpression.mkString(" "),
+                firstTokenStart,
+                lastTokenEnd,
+                currentPosArray,
+                currentNerTag
+              )
+            }
+            out.sortWith(_.start < _.start)
           }
         }
         annotatedText.map(x => Json(DefaultFormats).write(x)).saveAsTextFile(output)
