@@ -64,7 +64,7 @@ object NER {
 
         val conf = new SparkConf().setAppName("NLPAnnotator")
         val sc = new SparkContext(conf)
-        val data = sc.textFile(input, 2).cache()
+        val data = sc.textFile(input, 100).cache()
 
         // create a Stanford Object
         lazy val pipeline : StanfordCoreNLP = new StanfordCoreNLP({
