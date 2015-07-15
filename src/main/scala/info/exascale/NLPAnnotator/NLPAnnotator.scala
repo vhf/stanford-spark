@@ -3,8 +3,6 @@ package info.exascale.NLPAnnotator
 import java.util.Properties
 import java.io.File
 
-import org.apache.spark.rdd.RDD
-
 import scala.collection.JavaConverters._
 import collection.JavaConversions._
 
@@ -13,9 +11,6 @@ import edu.stanford.nlp.ling.CoreLabel
 import edu.stanford.nlp.pipeline.{Annotation, StanfordCoreNLP}
 import edu.stanford.nlp.ie.machinereading.structure.MachineReadingAnnotations.EntityMentionsAnnotation
 import edu.stanford.nlp.util.CoreMap
-import org.apache.spark.SparkContext
-import org.apache.spark.SparkContext._
-import org.apache.spark.SparkConf
 
 import scopt.OptionParser
 
@@ -62,10 +57,6 @@ object NER {
         val input = config.input.getAbsolutePath()
         val output = config.output.getAbsolutePath()
 
-        val conf = new SparkConf().setAppName("NLPAnnotator")
-        val sc = new SparkContext(conf)
-        val data = sc.textFile(input, 100).cache()
-
         // create a Stanford Object
         lazy val pipeline : StanfordCoreNLP = new StanfordCoreNLP({
           val props : Properties = new Properties
@@ -73,84 +64,84 @@ object NER {
           props
         })
 
-        val annotatedText = data.mapPartitions{ iter =>
-          iter.map { part =>
+        val wholeFile = scala.io.Source.fromFile(input).mkString
+
             // create an empty Annotation just with the given text
-            val document : Annotation = new Annotation(part)
-            pipeline.annotate(document)
+        val document : Annotation = new Annotation(wholeFile)
+        pipeline.annotate(document)
 
-            val sentences = document.get(classOf[SentencesAnnotation]).asScala
-            val tokens = sentences.toSeq.flatMap(sentence => {
-              sentence.get(classOf[TokensAnnotation]).asScala.toSeq.map(token => {
-                val entity = (sentence.get(classOf[TokenBeginAnnotation]), sentence.get(classOf[TokenEndAnnotation]))
-                val word = token.get(classOf[TextAnnotation])
-                val pos = token.get(classOf[PartOfSpeechAnnotation])
-                val ner = token.get(classOf[NamedEntityTagAnnotation])
-                val beg = token.get(classOf[CharacterOffsetBeginAnnotation])
-                val end = token.get(classOf[CharacterOffsetEndAnnotation])
-                //(word, ne, offset)
-                Map("word" -> word, "ner" -> ner, "beg" -> beg, "end" -> end, "pos" -> pos)
-              })
-            })
+        val sentences = document.get(classOf[SentencesAnnotation]).asScala
+        val tokens = sentences.toSeq.flatMap(sentence => {
+          sentence.get(classOf[TokensAnnotation]).asScala.toSeq.map(token => {
+            val entity = (sentence.get(classOf[TokenBeginAnnotation]), sentence.get(classOf[TokenEndAnnotation]))
+            val word = token.get(classOf[TextAnnotation])
+            val pos = token.get(classOf[PartOfSpeechAnnotation])
+            val ner = token.get(classOf[NamedEntityTagAnnotation])
+            val beg = token.get(classOf[CharacterOffsetBeginAnnotation])
+            val end = token.get(classOf[CharacterOffsetEndAnnotation])
+            //(word, ne, offset)
+            Map("word" -> word, "ner" -> ner, "beg" -> beg, "end" -> end, "pos" -> pos)
+          })
+        })
 
-            var out = ArrayBuffer[JSONObject]()
-            var currentNerTag = ""
-            var currentExpression = ArrayBuffer[String]()
-            var currentPosArray = ArrayBuffer[String]()
-            var firstTokenStart = -1
-            var lastTokenEnd = -1
+        var out = ArrayBuffer[JSONObject]()
+        var currentNerTag = ""
+        var currentExpression = ArrayBuffer[String]()
+        var currentPosArray = ArrayBuffer[String]()
+        var firstTokenStart = -1
+        var lastTokenEnd = -1
 
-            for (i <- tokens.indices) {
-              val token = tokens(i)
-              val word = token("word").toString
-              val ner = token("ner").toString
-              val pos = token("pos").toString
-              val beg = token("beg").toString.toInt
-              val end = token("end").toString.toInt
+        for (i <- tokens.indices) {
+          val token = tokens(i)
+          val word = token("word").toString
+          val ner = token("ner").toString
+          val pos = token("pos").toString
+          val beg = token("beg").toString.toInt
+          val end = token("end").toString.toInt
 
-              if (ner == "O") {
+          if (ner == "O") {
+            out += JSONObject(
+              word,
+              beg,
+              end,
+              ArrayBuffer(pos),
+              ner
+            )
+          } else {
+            if (ner != currentNerTag) {
+              if (currentExpression.length != 0) {
                 out += JSONObject(
-                  word,
-                  beg,
-                  end,
-                  ArrayBuffer(pos),
-                  ner
+                  currentExpression.mkString(" "),
+                  firstTokenStart,
+                  lastTokenEnd,
+                  currentPosArray,
+                  currentNerTag
                 )
-              } else {
-                if (ner != currentNerTag) {
-                  if (currentExpression.length != 0) {
-                    out += JSONObject(
-                      currentExpression.mkString(" "),
-                      firstTokenStart,
-                      lastTokenEnd,
-                      currentPosArray,
-                      currentNerTag
-                    )
-                  }
-                  currentNerTag = ner
-                  currentExpression = ArrayBuffer(word)
-                  currentPosArray = ArrayBuffer(pos)
-                  firstTokenStart = beg
-                } else {
-                  currentExpression ++= ArrayBuffer(word)
-                  currentPosArray ++= ArrayBuffer(pos)
-                  lastTokenEnd = end
-                }
               }
+              currentNerTag = ner
+              currentExpression = ArrayBuffer(word)
+              currentPosArray = ArrayBuffer(pos)
+              firstTokenStart = beg
+            } else {
+              currentExpression ++= ArrayBuffer(word)
+              currentPosArray ++= ArrayBuffer(pos)
+              lastTokenEnd = end
             }
-            if (currentExpression.length != 0) {
-              out += JSONObject(
-                currentExpression.mkString(" "),
-                firstTokenStart,
-                lastTokenEnd,
-                currentPosArray,
-                currentNerTag
-              )
-            }
-            out.sortWith(_.start < _.start)
           }
         }
-        annotatedText.map(x => Json(DefaultFormats).write(x)).saveAsTextFile(output)
+        if (currentExpression.length != 0) {
+          out += JSONObject(
+            currentExpression.mkString(" "),
+            firstTokenStart,
+            lastTokenEnd,
+            currentPosArray,
+            currentNerTag
+          )
+        }
+        val sortedOut = out.sortWith(_.start < _.start).map(x => Json(DefaultFormats).write(x))
+        val outFile = new java.io.FileWriter(output)
+        outFile.write(sortedOut.mkString(" "))
+        outFile.close
       case _ =>
         println("error")
     }
