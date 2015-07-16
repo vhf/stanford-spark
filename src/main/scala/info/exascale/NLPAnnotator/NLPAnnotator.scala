@@ -83,65 +83,6 @@ object NER {
             Map("word" -> word, "ner" -> ner, "beg" -> beg, "end" -> end, "pos" -> pos)
           })
         })
-
-        var out = ArrayBuffer[JSONObject]()
-        var currentNerTag = ""
-        var currentExpression = ArrayBuffer[String]()
-        var currentPosArray = ArrayBuffer[String]()
-        var firstTokenStart = -1
-        var lastTokenEnd = -1
-
-        for (i <- tokens.indices) {
-          val token = tokens(i)
-          val word = token("word").toString
-          val ner = token("ner").toString
-          val pos = token("pos").toString
-          val beg = token("beg").toString.toInt
-          val end = token("end").toString.toInt
-
-          if (ner == "O") {
-            out += JSONObject(
-              word,
-              beg,
-              end,
-              ArrayBuffer(pos),
-              ner
-            )
-          } else {
-            if (ner != currentNerTag) {
-              if (currentExpression.length != 0) {
-                out += JSONObject(
-                  currentExpression.mkString(" "),
-                  firstTokenStart,
-                  lastTokenEnd,
-                  currentPosArray,
-                  currentNerTag
-                )
-              }
-              currentNerTag = ner
-              currentExpression = ArrayBuffer(word)
-              currentPosArray = ArrayBuffer(pos)
-              firstTokenStart = beg
-            } else {
-              currentExpression ++= ArrayBuffer(word)
-              currentPosArray ++= ArrayBuffer(pos)
-              lastTokenEnd = end
-            }
-          }
-        }
-        if (currentExpression.length != 0) {
-          out += JSONObject(
-            currentExpression.mkString(" "),
-            firstTokenStart,
-            lastTokenEnd,
-            currentPosArray,
-            currentNerTag
-          )
-        }
-        val sortedOut = out.sortWith(_.start < _.start).map(x => Json(DefaultFormats).write(x))
-        val outFile = new java.io.FileWriter(output)
-        outFile.write(sortedOut.mkString(" "))
-        outFile.close
       case _ =>
         println("error")
     }
