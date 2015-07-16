@@ -37,6 +37,14 @@ object NER {
                       ner: String
                       )
 
+  def time[R](block: => R): R = {
+    val t0 = System.nanoTime()
+    val result = block    // call-by-name
+    val t1 = System.nanoTime()
+    println("Elapsed time: " + (t1 - t0) + "ns")
+    result
+  }
+
   val props = new Properties()
   def main(args: Array[String]) {
     val parser = new scopt.OptionParser[Config]("scopt") {
@@ -66,23 +74,25 @@ object NER {
 
         val wholeFile = scala.io.Source.fromFile(input).mkString
 
-            // create an empty Annotation just with the given text
-        val document : Annotation = new Annotation(wholeFile)
-        pipeline.annotate(document)
+        time {
+          // create an empty Annotation just with the given text
+          val document: Annotation = new Annotation(wholeFile)
+          pipeline.annotate(document)
 
-        val sentences = document.get(classOf[SentencesAnnotation]).asScala
-        val tokens = sentences.toSeq.flatMap(sentence => {
-          sentence.get(classOf[TokensAnnotation]).asScala.toSeq.map(token => {
-            val entity = (sentence.get(classOf[TokenBeginAnnotation]), sentence.get(classOf[TokenEndAnnotation]))
-            val word = token.get(classOf[TextAnnotation])
-            val pos = token.get(classOf[PartOfSpeechAnnotation])
-            val ner = token.get(classOf[NamedEntityTagAnnotation])
-            val beg = token.get(classOf[CharacterOffsetBeginAnnotation])
-            val end = token.get(classOf[CharacterOffsetEndAnnotation])
-            //(word, ne, offset)
-            Map("word" -> word, "ner" -> ner, "beg" -> beg, "end" -> end, "pos" -> pos)
+          val sentences = document.get(classOf[SentencesAnnotation]).asScala
+          val tokens = sentences.toSeq.flatMap(sentence => {
+            sentence.get(classOf[TokensAnnotation]).asScala.toSeq.map(token => {
+              val entity = (sentence.get(classOf[TokenBeginAnnotation]), sentence.get(classOf[TokenEndAnnotation]))
+              val word = token.get(classOf[TextAnnotation])
+              val pos = token.get(classOf[PartOfSpeechAnnotation])
+              val ner = token.get(classOf[NamedEntityTagAnnotation])
+              val beg = token.get(classOf[CharacterOffsetBeginAnnotation])
+              val end = token.get(classOf[CharacterOffsetEndAnnotation])
+              //(word, ne, offset)
+              Map("word" -> word, "ner" -> ner, "beg" -> beg, "end" -> end, "pos" -> pos)
+            })
           })
-        })
+        }
       case _ =>
         println("error")
     }
