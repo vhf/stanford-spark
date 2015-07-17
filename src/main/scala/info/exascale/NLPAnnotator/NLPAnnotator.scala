@@ -109,6 +109,10 @@ object NER {
               val end = token("end").toString.toInt
 
               if (ner == "O") {
+                currentNerTag = ""
+                currentExpression = ArrayBuffer()
+                currentPosArray = ArrayBuffer()
+                lastTokenEnd = -1
                 out += JSONObject(
                   word,
                   beg,
@@ -117,35 +121,32 @@ object NER {
                   ner
                 )
               } else {
-                if (ner != currentNerTag) {
-                  if (currentExpression.length != 0) {
-                    out += JSONObject(
-                      currentExpression.mkString(" "),
-                      firstTokenStart,
-                      lastTokenEnd,
-                      currentPosArray,
-                      currentNerTag
-                    )
-                  }
-                  currentNerTag = ner
-                  currentExpression = ArrayBuffer(word)
-                  currentPosArray = ArrayBuffer(pos)
-                  firstTokenStart = beg
-                } else {
-                  currentExpression ++= ArrayBuffer(word)
-                  currentPosArray ++= ArrayBuffer(pos)
-                  lastTokenEnd = end
+                if (out.length == 0) {
+                  out += JSONObject(
+                    word,
+                    beg,
+                    end,
+                    ArrayBuffer(pos),
+                    ner
+                  )
+                } else if (out(out.length - 1).ner != ner) {
+                  out += JSONObject(
+                    word,
+                    beg,
+                    end,
+                    ArrayBuffer(pos),
+                    ner
+                  )
+                } else if (out(out.length - 1).ner == ner) {
+                  out(out.length - 1) = JSONObject(
+                    out(out.length - 1).word + " " + word,
+                    out(out.length - 1).start,
+                    end,
+                    out(out.length - 1).pos ++= ArrayBuffer(pos),
+                    ner
+                  )
                 }
               }
-            }
-            if (currentExpression.length != 0) {
-              out += JSONObject(
-                currentExpression.mkString(" "),
-                firstTokenStart,
-                lastTokenEnd,
-                currentPosArray,
-                currentNerTag
-              )
             }
             out.sortWith(_.start < _.start)
           }
