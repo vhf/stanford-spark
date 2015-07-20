@@ -42,6 +42,14 @@ object NER {
                       ner: String
                       )
 
+  def time[R](block: => R): R = {
+    val t0 = System.nanoTime()
+    val result = block    // call-by-name
+    val t1 = System.nanoTime()
+    println("Elapsed time: " + (t1 - t0) + "ns")
+    result
+  }
+
   val props = new Properties()
   def main(args: Array[String]) {
     val parser = new scopt.OptionParser[Config]("scopt") {
@@ -73,85 +81,29 @@ object NER {
           props
         })
 
-        val annotatedText = data.mapPartitions{ iter =>
-          iter.map { part =>
-            // create an empty Annotation just with the given text
-            val document : Annotation = new Annotation(part)
-            pipeline.annotate(document)
+        val annotatedText = time {
+          data.mapPartitions{ iter =>
+            iter.map { part =>
+              // create an empty Annotation just with the given text
+              val document : Annotation = new Annotation(part)
+              pipeline.annotate(document)
 
-            val sentences = document.get(classOf[SentencesAnnotation]).asScala
-            val tokens = sentences.toSeq.flatMap(sentence => {
-              sentence.get(classOf[TokensAnnotation]).asScala.toSeq.map(token => {
-                val entity = (sentence.get(classOf[TokenBeginAnnotation]), sentence.get(classOf[TokenEndAnnotation]))
-                val word = token.get(classOf[TextAnnotation])
-                val pos = token.get(classOf[PartOfSpeechAnnotation])
-                val ner = token.get(classOf[NamedEntityTagAnnotation])
-                val beg = token.get(classOf[CharacterOffsetBeginAnnotation])
-                val end = token.get(classOf[CharacterOffsetEndAnnotation])
-                //(word, ne, offset)
-                Map("word" -> word, "ner" -> ner, "beg" -> beg, "end" -> end, "pos" -> pos)
+              val sentences = document.get(classOf[SentencesAnnotation]).asScala
+              val tokens = sentences.toSeq.flatMap(sentence => {
+                sentence.get(classOf[TokensAnnotation]).asScala.toSeq.map(token => {
+                  val entity = (sentence.get(classOf[TokenBeginAnnotation]), sentence.get(classOf[TokenEndAnnotation]))
+                  val word = token.get(classOf[TextAnnotation])
+                  val pos = token.get(classOf[PartOfSpeechAnnotation])
+                  val ner = token.get(classOf[NamedEntityTagAnnotation])
+                  val beg = token.get(classOf[CharacterOffsetBeginAnnotation])
+                  val end = token.get(classOf[CharacterOffsetEndAnnotation])
+                  Map("word" -> word, "ner" -> ner, "beg" -> beg, "end" -> end, "pos" -> pos)
+                })
               })
-            })
-
-            var out = ArrayBuffer[JSONObject]()
-            var currentNerTag = ""
-            var currentExpression = ArrayBuffer[String]()
-            var currentPosArray = ArrayBuffer[String]()
-            var firstTokenStart = -1
-            var lastTokenEnd = -1
-
-            for (i <- tokens.indices) {
-              val token = tokens(i)
-              val word = token("word").toString
-              val ner = token("ner").toString
-              val pos = token("pos").toString
-              val beg = token("beg").toString.toInt
-              val end = token("end").toString.toInt
-
-              if (ner == "O") {
-                currentNerTag = ""
-                currentExpression = ArrayBuffer()
-                currentPosArray = ArrayBuffer()
-                lastTokenEnd = -1
-                out += JSONObject(
-                  word,
-                  beg,
-                  end,
-                  ArrayBuffer(pos),
-                  ner
-                )
-              } else {
-                if (out.length == 0) {
-                  out += JSONObject(
-                    word,
-                    beg,
-                    end,
-                    ArrayBuffer(pos),
-                    ner
-                  )
-                } else if (out(out.length - 1).ner != ner) {
-                  out += JSONObject(
-                    word,
-                    beg,
-                    end,
-                    ArrayBuffer(pos),
-                    ner
-                  )
-                } else if (out(out.length - 1).ner == ner) {
-                  out(out.length - 1) = JSONObject(
-                    out(out.length - 1).word + " " + word,
-                    out(out.length - 1).start,
-                    end,
-                    out(out.length - 1).pos ++= ArrayBuffer(pos),
-                    ner
-                  )
-                }
-              }
             }
-            out.sortWith(_.start < _.start)
           }
         }
-        annotatedText.map(x => Json(DefaultFormats).write(x)).saveAsTextFile(output)
+        annotatedText.saveAsTextFile(output)
       case _ =>
         println("error")
     }
