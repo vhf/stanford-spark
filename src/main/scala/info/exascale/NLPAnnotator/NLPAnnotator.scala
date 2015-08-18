@@ -100,7 +100,6 @@ object NER {
             var currentNerTag = ""
             var currentExpression = ArrayBuffer[String]()
             var currentPosArray = ArrayBuffer[String]()
-            var firstTokenStart = -1
             var lastTokenEnd = -1
 
             for (i <- tokens.indices) {
@@ -124,7 +123,7 @@ object NER {
                   ner
                 )
               } else {
-                if (out.length == 0) {
+                if (out.isEmpty) {
                   out += JSONObject(
                     word,
                     beg,
@@ -132,7 +131,7 @@ object NER {
                     ArrayBuffer(pos),
                     ner
                   )
-                } else if (out(out.length - 1).ner != ner) {
+                } else if (out.last.ner != ner) {
                   out += JSONObject(
                     word,
                     beg,
@@ -140,12 +139,12 @@ object NER {
                     ArrayBuffer(pos),
                     ner
                   )
-                } else if (out(out.length - 1).ner == ner) {
+                } else if (out.last.ner == ner) {
                   out(out.length - 1) = JSONObject(
-                    out(out.length - 1).word + " " + word,
-                    out(out.length - 1).start,
+                    out.last.word + " " + word,
+                    out.last.start,
                     end,
-                    out(out.length - 1).pos ++= ArrayBuffer(pos),
+                    out.last.pos ++= ArrayBuffer(pos),
                     ner
                   )
                 }
