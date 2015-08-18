@@ -31,7 +31,8 @@ object NER {
   case class Config(
                      input: File = new File("."),
                      output: File = new File("."),
-                     props: Seq[String] = Seq()
+                     props: Seq[String] = Seq(),
+                     partitions: Int = 10
                      )
 
   case class JSONObject(
@@ -52,19 +53,21 @@ object NER {
         c.copy(output = x) } text("output directory")
       opt[Seq[String]]('p', "properties") valueName("<prop1>,<prop2>...") action { (x,c) =>
         c.copy(props = x) } text("properties")
+      opt[Int]('t', "partitions") action { (x, c) =>
+        c.copy(partitions = x) } text("number of RDD partitions")
       help("help") text("prints this usage text")
     }
 
     parser.parse(args, Config()) match {
       case Some(config) =>
         val properties = config.props mkString ", "
-
         val input = config.input.getAbsolutePath()
         val output = config.output.getAbsolutePath()
+        val partitions = config.partitions
 
         val conf = new SparkConf().setAppName("NLPAnnotator")
         val sc = new SparkContext(conf)
-        val data = sc.textFile(input, 100).cache()
+        val data = sc.textFile(input, partitions).cache()
 
         // create a Stanford Object
         lazy val pipeline : StanfordCoreNLP = new StanfordCoreNLP({
