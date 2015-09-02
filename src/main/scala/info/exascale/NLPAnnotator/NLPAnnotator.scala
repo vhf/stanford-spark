@@ -32,7 +32,8 @@ object NER {
                      input: File = new File("."),
                      output: File = new File("."),
                      props: Seq[String] = Seq(),
-                     partitions: Int = 10
+                     partitions: Int = 10,
+                     lowercase: Boolean = false
                      )
 
   case class JSONObject(
@@ -55,6 +56,8 @@ object NER {
         c.copy(props = x) } text("properties")
       opt[Int]('t', "partitions") action { (x, c) =>
         c.copy(partitions = x) } text("number of RDD partitions")
+      opt[Unit]("lowercase") action { (_, c) =>
+        c.copy(lowercase = true) } text("use lowercase models")
       help("help") text("prints this usage text")
     }
 
@@ -64,6 +67,7 @@ object NER {
         val input = config.input.getAbsolutePath()
         val output = config.output.getAbsolutePath()
         val partitions = config.partitions
+        val lowercase = config.lowercase
 
         val conf = new SparkConf().setAppName("NLPAnnotator")
         val sc = new SparkContext(conf)
@@ -73,6 +77,11 @@ object NER {
         lazy val pipeline : StanfordCoreNLP = new StanfordCoreNLP({
           val props : Properties = new Properties
           props.put("annotators", properties)
+          if (lowercase) {
+            props.put("pos.model", "edu/stanford/nlp/models/pos-tagger/english-caseless-left3words-distsim.tagger")
+            props.put("parse.model", "edu/stanford/nlp/models/lexparser/englishPCFG.caseless.ser.gz")
+            props.put("ner.model", "edu/stanford/nlp/models/ner/english.all.3class.caseless.distsim.crf.ser.gz edu/stanford/nlp/models/ner/english.muc.7class.caseless.distsim.crf.ser.gz edu/stanford/nlp/models/ner/english.conll.4class.caseless.distsim.crf.ser.gz")
+          }
           props
         })
 
