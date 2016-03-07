@@ -20,6 +20,7 @@ import org.apache.spark.SparkConf
 
 import scopt.OptionParser
 
+import scala.collection.mutable.ArrayBuffer
 
 
 object NER {
@@ -43,9 +44,6 @@ object NER {
       opt[File]('o', "output") required() valueName ("<file>") action { (x, c) =>
         c.copy(output = x)
       } text ("output directory")
-      opt[Seq[String]]('p', "properties") valueName ("<prop1>,<prop2>...") action { (x, c) =>
-        c.copy(props = x)
-      } text ("properties")
       opt[Int]('t', "partitions") action { (x, c) =>
         c.copy(partitions = x)
       } text ("number of RDD partitions")
@@ -57,7 +55,6 @@ object NER {
 
     parser.parse(args, Config()) match {
       case Some(config) =>
-        val properties = config.props mkString ", "
         val input = config.input.getAbsolutePath()
         val output = config.output.getAbsolutePath()
         val partitions = config.partitions
@@ -71,13 +68,9 @@ object NER {
 
         val annotatedText = data.mapPartitions { iter =>
           iter.map { part =>
-            return part.split("\n").map { line =>
-              val tweet = line.split("\t")(column)
-              println(tweet)
-              val classified = tweet + "\t" + classifier.classifyWithInlineXML(tweet)
-              println(classified)
-              return classified
-            }
+            val tweet = line.split("\t")(column)
+            val classified = tweet + "\t" + classifier.classifyWithInlineXML(tweet)
+            classified
           }
         }
         annotatedText.saveAsTextFile(output)
