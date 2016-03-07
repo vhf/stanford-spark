@@ -71,9 +71,12 @@ object NER {
 
         val annotatedText = data.mapPartitions { iter =>
           iter.map { part =>
-            part.split("\n").map { line =>
+            return part.split("\n").map { line =>
               val tweet = line.split("\t")(column)
-              tweet + "\t" + classifier.classifyWithInlineXML(tweet)
+              println(tweet)
+              val classified = tweet + "\t" + classifier.classifyWithInlineXML(tweet)
+              println(classified)
+              return classified
             }
           }
         }
